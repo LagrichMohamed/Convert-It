@@ -104,6 +104,7 @@ export default function Dropzone() {
     setFiles([]);
     setIsReady(false);
     setIsConverting(false);
+    setSelected("...");
   };
   const downloadAll = (): void => {
     for (let action of actions) {
@@ -127,9 +128,11 @@ export default function Dropzone() {
     let tmp_actions = actions.map((elt) => ({
       ...elt,
       is_converting: true,
+      to: selcted
     }));
     setActions(tmp_actions);
     setIsConverting(true);
+    
     for (let action of tmp_actions) {
       try {
         const { url, output } = await convertFile(ffmpegRef.current, action);
@@ -164,10 +167,26 @@ export default function Dropzone() {
   };
   const handleUpload = (data: Array<any>): void => {
     handleExitHover();
+    
+    // Check if all files are of the same type
+    const firstFileType = data[0].type.split('/')[0]; // Get 'image', 'video', or 'audio'
+    const allSameType = data.every(file => file.type.split('/')[0] === firstFileType);
+    
+    if (!allSameType) {
+      toast({
+        variant: "destructive",
+        title: "Error uploading files",
+        description: "All files must be of the same type (all images, all videos, or all audio).",
+        duration: 5000,
+      });
+      return;
+    }
+
+    // Reset the selected format
+    setSelected("...");
     setFiles(data);
     const tmp: Action[] = [];
     data.forEach((file: any) => {
-      const formData = new FormData();
       tmp.push({
         file_name: file.name,
         file_size: file.size,
@@ -184,27 +203,28 @@ export default function Dropzone() {
   };
   const handleHover = (): void => setIsHover(true);
   const handleExitHover = (): void => setIsHover(false);
-  const updateAction = (file_name: String, to: String) => {
+  const updateAction = (file_name: String | null, to: String) => {
     setActions(
       actions.map((action): Action => {
-        if (action.file_name === file_name) {
-          console.log("FOUND");
+        if (file_name === null || action.file_name === file_name) {
           return {
             ...action,
             to,
           };
         }
-
         return action;
       })
     );
   };
   const checkIsReady = (): void => {
-    let tmp_is_ready = true;
-    actions.forEach((action: Action) => {
-      if (!action.to) tmp_is_ready = false;
-    });
-    setIsReady(tmp_is_ready);
+    // If there's only one file, check if it has a format selected
+    if (actions.length === 1) {
+      setIsReady(actions[0].to !== null);
+      return;
+    }
+    
+    // For multiple files, check if a format is selected in the single selector
+    setIsReady(selcted !== "...");
   };
   const deleteAction = (action: Action): void => {
     setActions(actions.filter((elt) => elt !== action));
@@ -216,8 +236,10 @@ export default function Dropzone() {
       setFiles([]);
       setIsReady(false);
       setIsConverting(false);
-    } else checkIsReady();
-  }, [actions]);
+    } else {
+      checkIsReady();
+    }
+  }, [actions, selcted]);
   useEffect(() => {
     load();
   }, []);
@@ -227,10 +249,96 @@ export default function Dropzone() {
     setIsLoaded(true);
   };
 
+  const SingleFormatSelector = () => {
+    return (
+      <div className="w-full py-4 space-y-2 lg:py-0 relative rounded-xl border h-fit lg:h-20 px-4 lg:px-10 flex items-center justify-between mb-4">
+        <div className="text-muted-foreground text-md flex items-center gap-4">
+          <span>Convert all to</span>
+          <Select
+            onValueChange={(value) => {
+              if (extensions.audio.includes(value)) {
+                setDefaultValues("audio");
+              } else if (extensions.video.includes(value)) {
+                setDefaultValues("video");
+              }
+              setSelected(value);
+              // Update all actions at once
+              updateAction(null, value);
+            }}
+            value={selcted}
+          >
+            <SelectTrigger className="w-32 outline-none focus:outline-none focus:ring-0 text-center text-muted-foreground bg-background text-md font-medium">
+              <SelectValue placeholder="..." />
+            </SelectTrigger>
+            <SelectContent className="h-fit">
+              {actions[0]?.file_type.includes("image") && (
+                <div className="grid grid-cols-2 gap-2 w-fit">
+                  {extensions.image.map((elt, i) => (
+                    <div key={i} className="col-span-1 text-center">
+                      <SelectItem value={elt} className="mx-auto">
+                        {elt}
+                      </SelectItem>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {actions[0]?.file_type.includes("video") && (
+                <Tabs defaultValue={defaultValues} className="w-full">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="video" className="w-full">
+                      Video
+                    </TabsTrigger>
+                    <TabsTrigger value="audio" className="w-full">
+                      Audio
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="video">
+                    <div className="grid grid-cols-3 gap-2 w-fit">
+                      {extensions.video.map((elt, i) => (
+                        <div key={i} className="col-span-1 text-center">
+                          <SelectItem value={elt} className="mx-auto">
+                            {elt}
+                          </SelectItem>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="audio">
+                    <div className="grid grid-cols-3 gap-2 w-fit">
+                      {extensions.audio.map((elt, i) => (
+                        <div key={i} className="col-span-1 text-center">
+                          <SelectItem value={elt} className="mx-auto">
+                            {elt}
+                          </SelectItem>
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              )}
+              {actions[0]?.file_type.includes("audio") && (
+                <div className="grid grid-cols-2 gap-2 w-fit">
+                  {extensions.audio.map((elt, i) => (
+                    <div key={i} className="col-span-1 text-center">
+                      <SelectItem value={elt} className="mx-auto">
+                        {elt}
+                      </SelectItem>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    );
+  };
+
   // returns
   if (actions.length) {
     return (
       <div className="space-y-6">
+        {actions.length > 1 && <SingleFormatSelector />}
         {actions.map((action: Action, i: any) => (
           <div
             key={i}
@@ -241,7 +349,7 @@ export default function Dropzone() {
             )}
             <div className="flex gap-4 items-center">
               <span className="text-2xl text-orange-600">
-                {fileToIcon(action.file_type)}
+                {fileToIcon(action.file_type)} 
               </span>
               <div className="flex items-center gap-1 w-96">
                 <span className="text-md font-medium overflow-x-hidden">
@@ -271,83 +379,85 @@ export default function Dropzone() {
                 </span>
               </Badge>
             ) : (
-              <div className="text-muted-foreground text-md flex items-center gap-4">
-                <span>Convert to</span>
-                <Select
-                  onValueChange={(value) => {
-                    if (extensions.audio.includes(value)) {
-                      setDefaultValues("audio");
-                    } else if (extensions.video.includes(value)) {
-                      setDefaultValues("video");
-                    }
-                    setSelected(value);
-                    updateAction(action.file_name, value);
-                  }}
-                  value={selcted}
-                >
-                  <SelectTrigger className="w-32 outline-none focus:outline-none focus:ring-0 text-center text-muted-foreground bg-background text-md font-medium">
-                    <SelectValue placeholder="..." />
-                  </SelectTrigger>
-                  <SelectContent className="h-fit">
-                    {action.file_type.includes("image") && (
-                      <div className="grid grid-cols-2 gap-2 w-fit">
-                        {extensions.image.map((elt, i) => (
-                          <div key={i} className="col-span-1 text-center">
-                            <SelectItem value={elt} className="mx-auto">
-                              {elt}
-                            </SelectItem>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {action.file_type.includes("video") && (
-                      <Tabs defaultValue={defaultValues} className="w-full">
-                        <TabsList className="w-full">
-                          <TabsTrigger value="video" className="w-full">
-                            Video
-                          </TabsTrigger>
-                          <TabsTrigger value="audio" className="w-full">
-                            Audio
-                          </TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="video">
-                          <div className="grid grid-cols-3 gap-2 w-fit">
-                            {extensions.video.map((elt, i) => (
-                              <div key={i} className="col-span-1 text-center">
-                                <SelectItem value={elt} className="mx-auto">
-                                  {elt}
-                                </SelectItem>
-                              </div>
-                            ))}
-                          </div>
-                        </TabsContent>
-                        <TabsContent value="audio">
-                          <div className="grid grid-cols-3 gap-2 w-fit">
-                            {extensions.audio.map((elt, i) => (
-                              <div key={i} className="col-span-1 text-center">
-                                <SelectItem value={elt} className="mx-auto">
-                                  {elt}
-                                </SelectItem>
-                              </div>
-                            ))}
-                          </div>
-                        </TabsContent>
-                      </Tabs>
-                    )}
-                    {action.file_type.includes("audio") && (
-                      <div className="grid grid-cols-2 gap-2 w-fit">
-                        {extensions.audio.map((elt, i) => (
-                          <div key={i} className="col-span-1 text-center">
-                            <SelectItem value={elt} className="mx-auto">
-                              {elt}
-                            </SelectItem>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              actions.length === 1 && (
+                <div className="text-muted-foreground text-md flex items-center gap-4">
+                  <span>Convert to</span>
+                  <Select
+                    onValueChange={(value) => {
+                      if (extensions.audio.includes(value)) {
+                        setDefaultValues("audio");
+                      } else if (extensions.video.includes(value)) {
+                        setDefaultValues("video");
+                      }
+                      setSelected(value);
+                      updateAction(action.file_name, value);
+                    }}
+                    value={selcted}
+                  >
+                    <SelectTrigger className="w-32 outline-none focus:outline-none focus:ring-0 text-center text-muted-foreground bg-background text-md font-medium">
+                      <SelectValue placeholder="..." />
+                    </SelectTrigger>
+                    <SelectContent className="h-fit">
+                      {action.file_type.includes("image") && (
+                        <div className="grid grid-cols-2 gap-2 w-fit">
+                          {extensions.image.map((elt, i) => (
+                            <div key={i} className="col-span-1 text-center">
+                              <SelectItem value={elt} className="mx-auto">
+                                {elt}
+                              </SelectItem>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {action.file_type.includes("video") && (
+                        <Tabs defaultValue={defaultValues} className="w-full">
+                          <TabsList className="w-full">
+                            <TabsTrigger value="video" className="w-full">
+                              Video
+                            </TabsTrigger>
+                            <TabsTrigger value="audio" className="w-full">
+                              Audio
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="video">
+                            <div className="grid grid-cols-3 gap-2 w-fit">
+                              {extensions.video.map((elt, i) => (
+                                <div key={i} className="col-span-1 text-center">
+                                  <SelectItem value={elt} className="mx-auto">
+                                    {elt}
+                                  </SelectItem>
+                                </div>
+                              ))}
+                            </div>
+                          </TabsContent>
+                          <TabsContent value="audio">
+                            <div className="grid grid-cols-3 gap-2 w-fit">
+                              {extensions.audio.map((elt, i) => (
+                                <div key={i} className="col-span-1 text-center">
+                                  <SelectItem value={elt} className="mx-auto">
+                                    {elt}
+                                  </SelectItem>
+                                </div>
+                              ))}
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      )}
+                      {action.file_type.includes("audio") && (
+                        <div className="grid grid-cols-2 gap-2 w-fit">
+                          {extensions.audio.map((elt, i) => (
+                            <div key={i} className="col-span-1 text-center">
+                              <SelectItem value={elt} className="mx-auto">
+                                {elt}
+                              </SelectItem>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )
             )}
 
             {action.is_converted ? (
