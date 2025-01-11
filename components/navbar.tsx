@@ -30,7 +30,7 @@ export default function Navbar({ }): any {
             </div>
             <div className="items-center hidden gap-2 md:flex">
                 <ModeToggle />
-                <Link href="https://github.com/LagrichMohamed/ConvertIt">
+                <Link href="https://github.com/LagrichMohamed/Convert-It">
                     {/* <Button
                         variant="default"
                         className="items-center hidden gap-2 bg-black rounded-full w-fit md:flex"
@@ -78,7 +78,7 @@ export default function Navbar({ }): any {
                                         </Link>
                                     </SheetTrigger>
                                     < SheetTrigger asChild>
-                                    <Link href="https://github.com/LagrichMohamed/ConvertIt" className="text-center flex justify-center p-5">
+                                    <Link href="https://github.com/LagrichMohamed/Convert-It" className="text-center flex justify-center p-5">
                                         <span className="text-3xl">
                                             <BsGithub />
                                         </span>
